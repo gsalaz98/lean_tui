@@ -1,0 +1,17 @@
+[package]
+name = "lean_tui"
+version = "0.1.0"
+authors = ["Gerardo Salazar <gsalaz9800@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+crossterm = "0.17"
+crossbeam-channel = "0.4"
+tui = { version = "0.10", default-features = false, features = ['crossterm'] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[lib]
+crate-type = ["cdylib"]
