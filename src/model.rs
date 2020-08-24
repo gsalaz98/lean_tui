@@ -1,4 +1,6 @@
 use serde::*;
+use std::fmt::Display;
+use tui::{style::{Style, Color, Modifier}, text::Span};
 
 #[derive(Serialize, Deserialize)]
 pub enum PacketType
@@ -210,9 +212,58 @@ pub struct BacktestResults {
     #[serde(skip)]
     pub AlphaRuntimeStatistics: Option<Empty>,
 
-    pub Charts: std::collections::HashMap<String, Chart>,
-    //pub Orders: std::collections::HashMap<String, Order>,
+    pub Charts: Option<std::collections::HashMap<String, Chart>>,
+
+    pub Orders: Option<std::collections::HashMap<String, Order>>,
     //pub ProfitLoss: std::collections::HashMap<String, f64>
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Order {
+    pub Id: u64,
+    pub ContingentId: i64,
+    pub BrokerId: Vec<String>,
+    pub Symbol: Symbol,
+    pub Price: f64,
+    pub PriceCurrency: String,
+    pub Time: String,
+    pub CreatedTime: String,
+    pub LastFillTime: Option<String>,
+    pub LastUpdateTime: Option<String>,
+    pub CanceledTime: Option<String>,
+    pub Quantity: f64,
+    pub Type: i32,
+    pub Status: i32,
+
+    #[serde(skip)]
+    pub TimeInForce: Option<Empty>,
+
+    pub Tag: Option<String>,
+
+    #[serde(skip)]
+    pub Properties: Option<Empty>,
+
+    pub SecurityType: i32,
+    pub Direction: i32,
+    pub Value: f64,
+
+    #[serde(skip)]
+    pub OrderSubmissionData: Option<Empty>,
+
+    pub IsMarketable: bool,
+
+    // LimitOrder, StopLimitOrder
+    pub LimitPrice: Option<f64>,
+
+    pub StopPrice: Option<f64>,
+    pub StopTriggered: Option<bool>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Symbol {
+    pub Value: String,
+    pub ID: String,
+    pub Permtick: String
 }
 
 #[derive(Serialize, Deserialize)]
@@ -220,7 +271,7 @@ pub struct Chart {
     pub Name: String,
 
     #[serde(skip)]
-    pub ChartType: String,
+    pub ChartType: i32,
 
     pub Series: std::collections::HashMap<String, Series>
 }
@@ -228,10 +279,10 @@ pub struct Chart {
 #[derive(Serialize, Deserialize)]
 pub struct Series {
     pub Name: String,
-    pub Unit: String,
+    pub Unit: Option<String>,
     pub Index: i32,
     pub Values: Vec<ChartPoint>,
-    pub SeriesType: SeriesType,
+    pub SeriesType: i32,//SeriesType
 
     #[serde(skip)]
     pub Color: i32,
@@ -240,9 +291,9 @@ pub struct Series {
 
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ChartPoint {
-    pub x: i64,
+    pub x: f64,
     pub y: f64
 }
 
@@ -289,4 +340,103 @@ pub enum ScatterMarkerSymbol {
 
     #[serde(rename = "triangle-down")]
     TriangleDown
+}
+
+pub enum OrderType {
+    /// <summary>
+    /// Market Order Type
+    /// </summary>
+    Market = 0,
+
+    /// <summary>
+    /// Limit Order Type
+    /// </summary>
+    Limit = 1,
+
+    /// <summary>
+    /// Stop Market Order Type - Fill at market price when break target price
+    /// </summary>
+    StopMarket = 2,
+
+    /// <summary>
+    /// Stop limit order type - trigger fill once pass the stop price; but limit fill to limit price.
+    /// </summary>
+    StopLimit = 3,
+
+    /// <summary>
+    /// Market on open type - executed on exchange open
+    /// </summary>
+    MarketOnOpen = 4,
+
+    /// <summary>
+    /// Market on close type - executed on exchange close
+    /// </summary>
+    MarketOnClose = 5,
+
+    /// <summary>
+    /// Option Exercise Order Type
+    /// </summary>
+    OptionExercise = 6
+}
+
+impl Order {
+    pub fn into_spans<'a>(&self) -> (Span<'a>, Span<'a>, Span<'a>, Span<'a>, Span<'a>) {
+        (
+            Span::raw(self.Time.clone()),
+            Span::styled(OrderType::from(self.Type).to_string(), Style::default().add_modifier(Modifier::BOLD)),
+            direction_to_span(self.Direction),
+            Span::raw(self.Quantity.to_string()),
+            Span::raw(self.Symbol.Value.clone())
+        )
+    }
+}
+
+impl Display for OrderType {
+    fn fmt(&self, f: &mut export::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            OrderType::Limit => write!(f, "LMT"),
+            OrderType::Market => write!(f, "MKT"),
+            OrderType::MarketOnClose => write!(f, "MKTOC"),
+            OrderType::MarketOnOpen => write!(f, "MKTOO"),
+            OrderType::OptionExercise => write!(f, "OPTEXC"),
+            OrderType::StopMarket => write!(f, "STPMKT"),
+            OrderType::StopLimit => write!(f, "STPLMT"),
+        }       
+    }
+}
+
+fn direction_to_span<'a>(direction: i32) -> Span<'a> {
+    let (color, display) = if direction == 0 { 
+        (Color::Green,
+        "BOT".to_string())
+    } 
+    else if direction == 1 { 
+        (Color::Red,
+        "SLD".to_string())
+    } 
+    else { 
+        (Color::White,
+        "HLD".to_string())
+    };
+
+    Span::styled(display, Style::default().add_modifier(Modifier::BOLD).fg(color))
+}
+
+impl From<i32> for OrderType {
+    fn from(t: i32) -> Self {
+        match t {
+            0 => OrderType::Market,
+            1 => OrderType::Limit,
+            2 => OrderType::StopMarket,
+            3 => OrderType::StopLimit,
+            4 => OrderType::MarketOnOpen,
+            5 => OrderType::MarketOnClose,
+            6 => OrderType::OptionExercise,
+            _ => panic!("Failed to convert {} to OrderType", t)
+        }
+    }
+}
+
+impl OrderType {
+
 }
