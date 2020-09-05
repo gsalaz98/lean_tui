@@ -1,3 +1,6 @@
+pub mod model;
+pub mod terminal;
+
 use std::io::{stdout, Stdout, Write};
 use std::thread;
 use std::mem::ManuallyDrop;
@@ -21,14 +24,7 @@ use tui::{
     style::{Style, Color}, symbols::Marker
 };
 
-pub mod model;
-
-
-pub struct TerminalHandler {
-    pub terminal: ManuallyDrop<Arc<Mutex<Terminal<CrosstermBackend<Stdout>>>>>,
-    pub tx: ManuallyDrop<crossbeam_channel::Sender<Message>>,
-    pub bg_thread: ManuallyDrop<thread::JoinHandle<()>>,
-}
+use crate::terminal::terminal_handler::TerminalHandler;
 
 pub enum Message {
     Packet(model::BacktestResultPacket),
@@ -38,19 +34,11 @@ pub enum Message {
 
 #[no_mangle]
 extern "C" fn initialize() -> *mut TerminalHandler {
-    enable_raw_mode().unwrap();
+    let terminal_handler = TerminalHandler::default(); 
 
-    let mut stdout = stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture).unwrap();
+    terminal_handler.start();
 
-    let backend = CrosstermBackend::new(stdout);
-    let terminal = ManuallyDrop::new(Arc::new(Mutex::new(Terminal::new(backend).expect("Error creating terminal"))));
-    let (tx, rx) = crossbeam_channel::unbounded();
-    let tx = ManuallyDrop::new(tx);
-    let rx = ManuallyDrop::new(rx);
-    let term = terminal.clone();
-
-    let bg_thread = ManuallyDrop::new(thread::spawn(move || {
+    let bg_thread = thread::spawn(move || {
         let mut logs = Vec::with_capacity(1024);
         let mut equity_data: Vec<(f64, f64)> = vec![];
         let mut order_times = vec![];
@@ -252,13 +240,8 @@ extern "C" fn initialize() -> *mut TerminalHandler {
                 break;
             }
         }
-    }));
-
-    let term_box = Box::new(TerminalHandler { 
-        terminal,
-        tx,
-        bg_thread
     });
+
 
     Box::into_raw(term_box)
 }
