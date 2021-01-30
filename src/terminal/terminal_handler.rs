@@ -162,41 +162,6 @@ impl<'a> Term<'a> {
         renderer.left.render(frame);
         renderer.right.render(frame);
     }
-
-    pub fn render_graph(&self, frame: &mut tui::Frame<CrosstermBackend<Stdout>>) {
-        let graph_block = Block::default()
-            .title("Backtest Performance")
-            .borders(Borders::ALL);
-
-        if self.data.equity.len() != 0 {
-            frame.render_widget(graph_block, self.left.graph);
-            return
-        }
-
-        let equity = &self.data.equity;
-        let x_axis_bounds = [equity[0].0, equity[equity.len() - 1].0];
-        let y_axis_bounds = [
-            equity.iter().map(|(_, y)| y).fold(f64::INFINITY, |a, &b| a.min(b)),
-            equity.iter().map(|(_, y)| y).fold(0f64, |a, &b| a.max(b))
-        ];
-
-        let graph_widget = Chart::new(vec![
-        Dataset::default()
-            .name("Equity Curve")
-            .graph_type(GraphType::Line)
-            .marker(Marker::Dot)
-            .style(Style::default().fg(Color::White))
-            .data(&equity)])
-        .block(graph_block)
-        .x_axis(Axis::default()
-            .title("Time")
-            .bounds(x_axis_bounds))
-        .y_axis(Axis::default()
-            .title("Equity")
-            .bounds(y_axis_bounds));
-
-        frame.render_widget(graph_widget, self.left.graph);
-    }
 }
 
 
@@ -283,6 +248,60 @@ impl<'a> LeftTerminalChunks<'a> {
             data
         }
     }
+
+    pub fn render_logs(&self, frame: &mut tui::Frame<CrosstermBackend<Stdout>>) {
+        let log_block = Block::default()
+            .title("Algorithm Logs")
+            .borders(Borders::ALL);
+
+        let logs = self.data.logs
+            .iter()
+            .rev()
+            .take(self.logs.height as usize - 2)
+            .rev()
+            .map(|v| v.clone())
+            .collect::<Vec<ListItem>>();
+
+        let log_widget = List::new(logs)
+            .block(log_block);
+
+        frame.render_widget(log_widget, self.logs);
+    }
+
+    pub fn render_graph(&self, frame: &mut tui::Frame<CrosstermBackend<Stdout>>) {
+        let graph_block = Block::default()
+            .title("Backtest Performance")
+            .borders(Borders::ALL);
+
+        if self.data.equity.len() == 0 {
+            frame.render_widget(graph_block, self.graph);
+            return
+        }
+
+        let equity = &self.data.equity;
+        let x_axis_bounds = [equity[0].0, equity[equity.len() - 1].0];
+        let y_axis_bounds = [
+            equity.iter().map(|(_, y)| y).fold(f64::INFINITY, |a, &b| a.min(b)),
+            equity.iter().map(|(_, y)| y).fold(0f64, |a, &b| a.max(b))
+        ];
+
+        let graph_widget = Chart::new(vec![
+        Dataset::default()
+            .name("Equity Curve")
+            .graph_type(GraphType::Line)
+            .marker(Marker::Dot)
+            .style(Style::default().fg(Color::White))
+            .data(&equity)])
+        .block(graph_block)
+        .x_axis(Axis::default()
+            .title("Time")
+            .bounds(x_axis_bounds))
+        .y_axis(Axis::default()
+            .title("Equity")
+            .bounds(y_axis_bounds));
+
+        frame.render_widget(graph_widget, self.graph);
+    }
 }
 
 impl<'a> RightTerminalChunk<'a> {
@@ -309,23 +328,9 @@ impl OrdersChunk {
 }
 
 impl<'a> TerminalRenderer for LeftTerminalChunks<'a> {
-    fn render(&self, frame: &mut tui::Frame<CrosstermBackend<Stdout>>) {
-        let log_block = Block::default()
-            .title("Algorithm Logs")
-            .borders(Borders::ALL);
-
-        let logs = self.data.logs
-            .iter()
-            .rev()
-            .take(self.logs.height as usize - 2)
-            .rev()
-            .map(|v| v.clone())
-            .collect::<Vec<ListItem>>();
-
-        let log_widget = List::new(logs)
-            .block(log_block);
-
-        frame.render_widget(log_widget, self.logs);
+    fn render(&self, frame: &mut tui::Frame<CrosstermBackend<Stdout>>) {            
+        self.render_logs(frame);
+        self.render_graph(frame);
     }
 }
 
